@@ -1,4 +1,4 @@
-Microsoft (R) Macro Assembler Version 11.00.50727.1	    02/11/15 15:29:14
+Microsoft (R) Macro Assembler Version 11.00.61030.0	    09/22/16 18:39:53
 main.asm						     Page 1 - 1
 
 
@@ -16,18 +16,48 @@ main.asm						     Page 1 - 1
 
 				; named memory allocation and initialization
  00000000			.DATA
+					
+					; We will be using DWORDS because the formula gives us final results ranging:
+					; -2000d is the value of 2(-999 + 000 - 1) + 0000, which is the minimum possible value for this problem.
+					; 11995d is the value of 2(-000 + 999 - 1) + 9999, which is the maximum possible value for this problem.
+					; [-2000d, 11995d], which exceeds the range of 16 bit signed integers ([-32768d, 32767d]),
+					; but does not exceed the range of 32 bit integers ([-2147483648d, 2147483647d]).
+					
+ 00000000 00000394			areaCode			DWORD	916		; 16 bit decimal
+ 00000004 0000022B			phoneNumberFirst3	DWORD	555		; 16 bit decimal
+ 00000008 000004D2			phoneNumberLast4	DWORD	1234	; 16 bit decimal
 
 				; procedure code
  00000000			.CODE
  00000000			main	PROC
+					
+					; The purpose of this program is to compute the value of the expression
+					; 2 ( - zipCode + phoneNumberFirst3 - 1 ) + phoneNumberLast4
+					; where zipCode = 95822d, phoneNumberFirst3 = 555d,
+					; phoneNumberLast4 = 1234d
+					; We will be computing this value in the EAX register, because it is 16 bits wide, which is necessary
+					; for this application as discussed above.
 
- 00000000  B8 00000000			mov eax, 0
- 00000005  C3				ret
- 00000006			main	ENDP
+ 00000000  A1 00000000 R		mov		eax, areaCode			; EAX := areaCode
+					
+ 00000005  F7 D8			neg		eax						; EAX := -areaCode
+					
+ 00000007  03 05 00000004 R		add		eax, phoneNumberFirst3	; EAX := -areaCode + phoneNumberFirst3
+					
+ 0000000D  83 E8 01			sub		eax, 1					; EAX := -areaCode + phoneNumberFirst3 - 1
+					
+ 00000010  03 C0			add		eax, eax				; EAX := 2(-areaCode + phoneNumberFirst3 - 1)
+													; actually done by adding (-areaCode + phoneNumberFirst3 - 1) to itself
+					
+ 00000012  03 05 00000008 R		add		eax, phoneNumberLast4	; EAX := 2(-areaCode + phoneNumberFirst3 - 1) + phoneNumberLast4
+
+ 00000018  B8 00000000			mov		eax, 0					; return 0
+ 0000001D  C3				ret
+
+ 0000001E			main	ENDP
 
 				END
-	
-Microsoft (R) Macro Assembler Version 11.00.50727.1	    02/11/15 15:29:14
+Microsoft (R) Macro Assembler Version 11.00.61030.0	    09/22/16 18:39:53
 main.asm						     Symbols 2 - 1
 
 
@@ -39,15 +69,15 @@ Segments and Groups:
 
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
-_DATA  . . . . . . . . . . . . .	32 Bit	 00000000 Para	  Public  'DATA'	
-_TEXT  . . . . . . . . . . . . .	32 Bit	 00000006 Para	  Public  'CODE'	
+_DATA  . . . . . . . . . . . . .	32 Bit	 0000000C Para	  Public  'DATA'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 0000001E Para	  Public  'CODE'	
 
 
 Procedures, parameters, and locals:
 
                 N a m e                 Type     Value    Attr
 
-main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 00000006 Public
+main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 0000001E Public
 
 
 Symbols:
@@ -63,6 +93,9 @@ Symbols:
 @fardata?  . . . . . . . . . . .	Text   	 FLAT
 @fardata . . . . . . . . . . . .	Text   	 FLAT
 @stack . . . . . . . . . . . . .	Text   	 FLAT
+areaCode . . . . . . . . . . . .	DWord	 00000000 _DATA	
+phoneNumberFirst3  . . . . . . .	DWord	 00000004 _DATA	
+phoneNumberLast4 . . . . . . . .	DWord	 00000008 _DATA	
 
 	   0 Warnings
 	   0 Errors
