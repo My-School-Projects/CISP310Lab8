@@ -1,37 +1,110 @@
 .586
 .MODEL FLAT	; only 32 bit addresses, no segment:offset
 
-INCLUDE io.h   ; header file for input/output
-
 .STACK 4096	   ; allocate 4096 bytes for the stack
 
 .DATA
 	
-	; We are using DWORD sizes, because the problem spec says to.
+	; We are using DWORD sizes, because we are using the cdecl protocol, which requires DWORDs on the stack.
 	; We are using unsing unsigned because the problem says the two numbers are positive
 	
-	; These prompts will be displayed when asking for numbers
-	; They are null terminated because the input macro expects a C-string
-	number1Prompt BYTE "Please input a positive integer", 0
-	number2Prompt BYTE "Please input another positive integer", 0
-
-	; inputString will be used to store the user's inputs in ASCII.
-	; It is 11 characters long because the longest input will be "4294967295" (11 characters) and the input
-	; macro appends a trailing null (11)
-	; we tried this with 10 bytes, but because of the trailing null the final character of a 10 character number would get cut off,
-	; leaving only 9 characters to represent the number.
-	inputString BYTE 11 DUP ("X")
-
-	; gcdString will be used with dtoa, which expects 11 characters + Null terminator
-	gcdString BYTE 11 DUP ("X"), 0	; String to store gcd in decimal for output
-	
-	; gcdOutputLabel will be used to label the gcd when it is displayed
-	gcdOutputLabel BYTE "Greatest Common Divisor"
-
+	number1 DWORD 21
+	number2 DWORD 49
 
 .CODE
-_MainProc PROC
+main PROC
 	
+	; CONTENTS OF REGISTERS HERE...
+
+	; call gcdProc(number1, number2)
+	; set up parameters (push in reverse order)
+
+	mov eax, number2
+	push eax
+
+	; stack holds:
+	;
+	; | number2 | <-- ESP
+
+	mov eax, number1
+	push eax
+
+	; stack holds:
+	;
+	; | number1 | <-- ESP
+	; | number2 |
+
+	call gcdProc
+
+	; stack holds:
+	;
+	; | number1 | <-- ESP
+	; | number2 |
+	
+	; remove parameters from stack
+	pop ebx
+
+	; stack holds:
+	;
+	; | number2 | <-- ESP
+
+	pop ebx									; ebx is trash
+
+	; stack is empty here
+
+	; MUST BE THE SAME HERE AS ABOVE (except for eax, which was used to return a value)
+
+	; eax now holds gcd
+
+	mov eax, 0								; exit with return code 0
+	
+	ret
+main ENDP
+
+; gcdProc(number1, number2)
+gcdProc PROC
+	
+	; stack holds:
+	;
+	; | ret addr|
+	; | number1 |
+	; | number2 |
+
+	push ebp				; save old ebp so I can use it for accessing parameters
+	mov ebp, esp			; establish access to parameters
+
+	; stack holds:
+	;
+	; | old ebp | <-- ESP <-- EBP
+	; | ret addr|
+	; | number1 |
+	; | number2 |
+
+	; save the registers we will use in this procedure
+	push ebx
+
+	; stack holds:
+	;
+	; | old ebx | <-- ESP
+	; | old ebp | <-- EBP
+	; | ret addr|
+	; | number1 |
+	; | number2 |
+
+	push ecx
+
+	; stack holds:
+	;
+	; | old ecx | <-- ESP
+	; | old ebx |
+	; | old ebp | <-- EBP
+	; | ret addr|
+	; | number1 |
+	; | number2 |
+	
+	; no need to push eax, we will be using it to return the value of gcd
+
+	; LOGIC
 	; gcd := number1
 	; remainder := number2
 	; loopStart
@@ -45,33 +118,55 @@ _MainProc PROC
 	; ecx = remainder
 	; eax = dividend
 
-	input number1Prompt, inputString, 11	; get input from user (maximum 11 characters, as explained above at inputString)
-	atod inputString						; convert input from ASCII coded decimal to binary integer (stored in EAX)
-	mov ebx, eax							; gcd := user input
-
-	input number2Prompt, inputString, 11	; get input from user
-	atod inputString						; convert input from string to binary integer (stored in EAX)
-	mov ecx, eax							; remainder := user input
+	; Get values from parameters
+	mov ebx, DWORD PTR [ebp + 4 * 3]	; gcd := number1
+	mov ecx, DWORD PTR [ebp + 4 * 2]	; remainder := number2
 
 loopStart:
-	mov eax, ebx							; dividend := gcd
-	mov ebx, ecx							; gcd := remainder
+	mov eax, ebx			; dividend := gcd
+	mov ebx, ecx			; gcd := remainder
 	
-	mov edx, 0								; EDX will be used as the higher order bits for the dividend
-											; we must set EDX to 0 before dividing because the higher order bits are not significant
-	div ebx									; divide dividend by gcd (to get dividend mod gcd)
-	mov ecx, edx							; remainder := dividend mod gcd
-	cmp ecx, 0								; remainder = 0?
-	jnz loopStart							; if (remainder != 0) goto loopStart
+	mov edx, 0				; EDX will be used as the higher order bits for the dividend
+							; we must set EDX to 0 before dividing because the higher order bits are not significant
+	div ebx					; divide dividend by gcd (to get dividend mod gcd)
+	mov ecx, edx			; remainder := dividend mod gcd
+	cmp ecx, 0				; remainder = 0?
+	jnz loopStart			; if (remainder != 0) goto loopStart
 loopEnd:
 	
-	dtoa gcdString, ebx						; convert gcd to string (for output)
-	output gcdOutputLabel, gcdString		; output gcd
+	mov eax, ebx			; move gcd to eax for return
 
+	; restore register values (pop in reverse order)
+	pop ecx
 
-	mov eax, 0								; exit with return code 0
-	
+	; stack holds:
+	;
+	; | old ebx | <-- ESP
+	; | old ebp | <-- EBP
+	; | ret addr|
+	; | number1 |
+	; | number2 |
+
+	pop ebx
+
+	; stack holds:
+	;
+	; | old ebp | <-- ESP <-- EBP
+	; | ret addr|
+	; | number1 |
+	; | number2 |
+
+	pop ebp
+
+	; stack holds:
+	;				  EBP --> ? (whatever it was when we pushed it)
+	; | ret addr| <-- ESP
+	; | number1 |
+	; | number2 |
+
+	; return to caller
 	ret
-_MainProc ENDP
+
+gcdProc ENDP
 
 END   ; end of source code

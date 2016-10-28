@@ -1,63 +1,103 @@
-Microsoft (R) Macro Assembler Version 11.00.61030.0	    09/22/16 18:39:53
+Microsoft (R) Macro Assembler Version 11.00.61030.0	    10/27/16 18:15:32
 main.asm						     Page 1 - 1
 
 
-				; general comments
-				; This version is compatible with Visual Studio 2012 and Visual C++ Express Edition 2012
-
-				; preprocessor directives
 				.586
-				.MODEL FLAT
+				.MODEL FLAT	; only 32 bit addresses, no segment:offset
 
-				; external files to link with
+				.STACK 4096	   ; allocate 4096 bytes for the stack
 
-				; stack configuration
-				.STACK 4096
-
-				; named memory allocation and initialization
  00000000			.DATA
 					
-					; We will be using DWORDS because the formula gives us final results ranging:
-					; -2000d is the value of 2(-999 + 000 - 1) + 0000, which is the minimum possible value for this problem.
-					; 11995d is the value of 2(-000 + 999 - 1) + 9999, which is the maximum possible value for this problem.
-					; [-2000d, 11995d], which exceeds the range of 16 bit signed integers ([-32768d, 32767d]),
-					; but does not exceed the range of 32 bit integers ([-2147483648d, 2147483647d]).
+					; We are using DWORD sizes, because we are using the cdecl protocol, which requires DWORDs on the stack.
+					; We are using unsing unsigned because the problem says the two numbers are positive
 					
- 00000000 00000394			areaCode			DWORD	916		; 16 bit decimal
- 00000004 0000022B			phoneNumberFirst3	DWORD	555		; 16 bit decimal
- 00000008 000004D2			phoneNumberLast4	DWORD	1234	; 16 bit decimal
+ 00000000 00000015			number1 DWORD 21
+ 00000004 00000031			number2 DWORD 49
 
-				; procedure code
  00000000			.CODE
- 00000000			main	PROC
+ 00000000			main PROC
 					
-					; The purpose of this program is to compute the value of the expression
-					; 2 ( - zipCode + phoneNumberFirst3 - 1 ) + phoneNumberLast4
-					; where zipCode = 95822d, phoneNumberFirst3 = 555d,
-					; phoneNumberLast4 = 1234d
-					; We will be computing this value in the EAX register, because it is 16 bits wide, which is necessary
-					; for this application as discussed above.
+					; CONTENTS OF REGISTERS HERE...
 
- 00000000  A1 00000000 R		mov		eax, areaCode			; EAX := areaCode
-					
- 00000005  F7 D8			neg		eax						; EAX := -areaCode
-					
- 00000007  03 05 00000004 R		add		eax, phoneNumberFirst3	; EAX := -areaCode + phoneNumberFirst3
-					
- 0000000D  83 E8 01			sub		eax, 1					; EAX := -areaCode + phoneNumberFirst3 - 1
-					
- 00000010  03 C0			add		eax, eax				; EAX := 2(-areaCode + phoneNumberFirst3 - 1)
-													; actually done by adding (-areaCode + phoneNumberFirst3 - 1) to itself
-					
- 00000012  03 05 00000008 R		add		eax, phoneNumberLast4	; EAX := 2(-areaCode + phoneNumberFirst3 - 1) + phoneNumberLast4
+					; call gcdProc(number1, number2)
+					; set up parameters (push in reverse order)
 
- 00000018  B8 00000000			mov		eax, 0					; return 0
- 0000001D  C3				ret
+ 00000000  A1 00000004 R		mov eax, number2
+ 00000005  50				push eax
+ 00000006  A1 00000000 R		mov eax, number1
+ 0000000B  50				push eax
 
- 0000001E			main	ENDP
+ 0000000C  E8 00000008			call gcdProc
+					
+					; remove parameters from stack
+ 00000011  5B				pop ebx
+ 00000012  5B				pop ebx									; ebx is trash
 
-				END
-Microsoft (R) Macro Assembler Version 11.00.61030.0	    09/22/16 18:39:53
+					; MUST BE THE SAME HERE (except for eax)
+
+					; eax now holds gcd
+
+ 00000013  B8 00000000			mov eax, 0								; exit with return code 0
+					
+ 00000018  C3				ret
+ 00000019			main ENDP
+
+				; gcdProc(number1, number2)
+ 00000019			gcdProc PROC
+					
+ 00000019  55				push ebp				; save old ebp so I can use it for accessing parameters
+ 0000001A  8B EC			mov ebp, esp			; establish access to parameters
+
+					; save the registers we will use in this procedure
+ 0000001C  53				push ebx
+ 0000001D  51				push ecx
+					; no need to push eax, we will be using it to return the value of gcd
+
+					; LOGIC
+					; gcd := number1
+					; remainder := number2
+					; loopStart
+					;   dividend := gcd
+					;   gcd := remainder
+					;   remainder := dividend mod gcd
+					; until(remainder = 0)
+
+					; We are using DWORD sizes, because the problem spec says to.
+					; ebx = gcd
+					; ecx = remainder
+					; eax = dividend
+
+					; Get values from parameters
+ 0000001E  8B 5D 0C			mov ebx, DWORD PTR [ebp + 4 * 3]	; gcd := number1
+ 00000021  8B 4D 08			mov ecx, DWORD PTR [ebp + 4 * 2]	; remainder := number2
+
+ 00000024			loopStart:
+ 00000024  8B C3			mov eax, ebx			; dividend := gcd
+ 00000026  8B D9			mov ebx, ecx			; gcd := remainder
+					
+ 00000028  BA 00000000			mov edx, 0				; EDX will be used as the higher order bits for the dividend
+											; we must set EDX to 0 before dividing because the higher order bits are not significant
+ 0000002D  F7 F3			div ebx					; divide dividend by gcd (to get dividend mod gcd)
+ 0000002F  8B CA			mov ecx, edx			; remainder := dividend mod gcd
+ 00000031  83 F9 00			cmp ecx, 0				; remainder = 0?
+ 00000034  75 EE			jnz loopStart			; if (remainder != 0) goto loopStart
+ 00000036			loopEnd:
+					
+ 00000036  8B C3			mov eax, ebx			; move gcd to eax for return
+
+					; restore register values (pop in reverse order)
+ 00000038  59				pop ecx
+ 00000039  5B				pop ebx
+ 0000003A  5D				pop ebp
+
+					; return to caller
+ 0000003B  C3				ret
+
+ 0000003C			gcdProc ENDP
+
+				END   ; end of source code
+Microsoft (R) Macro Assembler Version 11.00.61030.0	    10/27/16 18:15:32
 main.asm						     Symbols 2 - 1
 
 
@@ -69,15 +109,18 @@ Segments and Groups:
 
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
-_DATA  . . . . . . . . . . . . .	32 Bit	 0000000C Para	  Public  'DATA'	
-_TEXT  . . . . . . . . . . . . .	32 Bit	 0000001E Para	  Public  'CODE'	
+_DATA  . . . . . . . . . . . . .	32 Bit	 00000008 Para	  Public  'DATA'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 0000003C Para	  Public  'CODE'	
 
 
 Procedures, parameters, and locals:
 
                 N a m e                 Type     Value    Attr
 
-main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 0000001E Public
+gcdProc  . . . . . . . . . . . .	P Near	 00000019 _TEXT	Length= 00000023 Public
+  loopStart  . . . . . . . . . .	L Near	 00000024 _TEXT	
+  loopEnd  . . . . . . . . . . .	L Near	 00000036 _TEXT	
+main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 00000019 Public
 
 
 Symbols:
@@ -93,9 +136,8 @@ Symbols:
 @fardata?  . . . . . . . . . . .	Text   	 FLAT
 @fardata . . . . . . . . . . . .	Text   	 FLAT
 @stack . . . . . . . . . . . . .	Text   	 FLAT
-areaCode . . . . . . . . . . . .	DWord	 00000000 _DATA	
-phoneNumberFirst3  . . . . . . .	DWord	 00000004 _DATA	
-phoneNumberLast4 . . . . . . . .	DWord	 00000008 _DATA	
+number1  . . . . . . . . . . . .	DWord	 00000000 _DATA	
+number2  . . . . . . . . . . . .	DWord	 00000004 _DATA	
 
 	   0 Warnings
 	   0 Errors
