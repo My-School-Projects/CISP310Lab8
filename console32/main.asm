@@ -31,15 +31,15 @@ main PROC
 
 	; stack holds:
 	;
-	; | number1 | <-- ESP
 	; | number2 |
+	; | number1 | <-- ESP
 
 	call gcdProc
 
 	; stack holds:
 	;
-	; | number1 | <-- ESP
 	; | number2 |
+	; | number1 | <-- ESP
 	
 	; remove parameters from stack
 	pop ebx
@@ -66,41 +66,41 @@ gcdProc PROC
 	
 	; stack holds:
 	;
-	; | ret addr|
-	; | number1 |
 	; | number2 |
+	; | number1 |
+	; | ret addr| <-- ESP
 
 	push ebp				; save old ebp so I can use it for accessing parameters
 	mov ebp, esp			; establish access to parameters
 
 	; stack holds:
 	;
-	; | old ebp | <-- ESP <-- EBP
-	; | ret addr|
-	; | number1 |
 	; | number2 |
+	; | number1 |
+	; | ret addr|
+	; | old ebp | <-- ESP <-- EBP
 
 	; save the registers we will use in this procedure
 	push ebx
 
 	; stack holds:
 	;
-	; | old ebx | <-- ESP
-	; | old ebp | <-- EBP
-	; | ret addr|
-	; | number1 |
 	; | number2 |
+	; | number1 |
+	; | ret addr|
+	; | old ebp | <-- EBP
+	; | old ebx | <-- ESP
 
 	push ecx
 
 	; stack holds:
 	;
-	; | old ecx | <-- ESP
-	; | old ebx |
-	; | old ebp | <-- EBP
-	; | ret addr|
-	; | number1 |
 	; | number2 |
+	; | number1 |
+	; | ret addr|
+	; | old ebp | <-- EBP
+	; | old ebx |
+	; | old ecx | <-- ESP
 	
 	; no need to push eax, we will be using it to return the value of gcd
 
@@ -119,8 +119,29 @@ gcdProc PROC
 	; eax = dividend
 
 	; Get values from parameters
-	mov ebx, DWORD PTR [ebp + 4 * 3]	; gcd := number1
-	mov ecx, DWORD PTR [ebp + 4 * 2]	; remainder := number2
+	; to access the parameters, we use ebp which points 2 elements above the first parameter in the stack.
+
+	; accessing parameters:
+	;
+	; | number2 |
+	; | number1 | <----- EBP + 8
+	; | ret addr|      |
+	; | old ebp | <-- EBP
+	; | old ebx |
+	; | old ecx |
+
+	mov ebx, DWORD PTR [ebp + 8]	; gcd := number1
+
+	; accessing parameters:
+	;
+	; | number2 | <----- EBP + 12
+	; | number1 |	   |
+	; | ret addr|      |
+	; | old ebp | <-- EBP
+	; | old ebx |
+	; | old ecx |
+
+	mov ecx, DWORD PTR [ebp + 12]	; remainder := number2
 
 loopStart:
 	mov eax, ebx			; dividend := gcd
@@ -141,28 +162,29 @@ loopEnd:
 
 	; stack holds:
 	;
-	; | old ebx | <-- ESP
-	; | old ebp | <-- EBP
-	; | ret addr|
-	; | number1 |
 	; | number2 |
+	; | number1 |
+	; | ret addr|
+	; | old ebp | <-- EBP
+	; | old ebx | <-- ESP
 
 	pop ebx
 
 	; stack holds:
 	;
-	; | old ebp | <-- ESP <-- EBP
-	; | ret addr|
-	; | number1 |
 	; | number2 |
+	; | number1 |
+	; | ret addr|
+	; | old ebp | <-- ESP <-- EBP
 
 	pop ebp
 
 	; stack holds:
-	;				  EBP --> ? (whatever it was when we pushed it)
-	; | ret addr| <-- ESP
-	; | number1 |
+	;
 	; | number2 |
+	; | number1 |
+	; | ret addr| <-- ESP
+	;				  EBP --> ? (whatever it was when we pushed it)
 
 	; return to caller
 	ret
