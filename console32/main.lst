@@ -1,4 +1,4 @@
-Microsoft (R) Macro Assembler Version 11.00.61030.0	    10/27/16 18:15:32
+Microsoft (R) Macro Assembler Version 11.00.61030.0	    10/27/16 19:00:18
 main.asm						     Page 1 - 1
 
 
@@ -25,16 +25,38 @@ main.asm						     Page 1 - 1
 
  00000000  A1 00000004 R		mov eax, number2
  00000005  50				push eax
+
+					; stack holds:
+					;
+					; | number2 | <-- ESP
+
  00000006  A1 00000000 R		mov eax, number1
  0000000B  50				push eax
 
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 | <-- ESP
+
  0000000C  E8 00000008			call gcdProc
+
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 | <-- ESP
 					
 					; remove parameters from stack
  00000011  5B				pop ebx
+
+					; stack holds:
+					;
+					; | number2 | <-- ESP
+
  00000012  5B				pop ebx									; ebx is trash
 
-					; MUST BE THE SAME HERE (except for eax)
+					; stack is empty here
+
+					; MUST BE THE SAME HERE AS ABOVE (except for eax, which was used to return a value)
 
 					; eax now holds gcd
 
@@ -46,12 +68,47 @@ main.asm						     Page 1 - 1
 				; gcdProc(number1, number2)
  00000019			gcdProc PROC
 					
- 00000019  55				push ebp				; save old ebp so I can use it for accessing parameters
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 |
+					; | ret addr| <-- ESP
+
+ 00000019  55				push ebp				; save old ebp so I can use EBP down below as a stationary reference for accessing parameters
  0000001A  8B EC			mov ebp, esp			; establish access to parameters
 
-					; save the registers we will use in this procedure
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 |
+					; | ret addr|
+					; | old ebp | <-- ESP <-- EBP
+
+					; save the registers we will use in this procedure instructions to calculate the GCD
+
  0000001C  53				push ebx
+
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 |
+					; | ret addr|
+					; | old ebp | <-- EBP
+					; | old ebx | <-- ESP
+
  0000001D  51				push ecx
+
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 |
+					; | ret addr|
+					; | old ebp | <-- EBP
+					; | old ebx |
+					; | old ecx | <-- ESP
+
+ 0000001E  9C				pushfd		; save EFLAGS, because this code will change the EFLAGS register
+					
 					; no need to push eax, we will be using it to return the value of gcd
 
 					; LOGIC
@@ -69,35 +126,82 @@ main.asm						     Page 1 - 1
 					; eax = dividend
 
 					; Get values from parameters
- 0000001E  8B 5D 0C			mov ebx, DWORD PTR [ebp + 4 * 3]	; gcd := number1
- 00000021  8B 4D 08			mov ecx, DWORD PTR [ebp + 4 * 2]	; remainder := number2
+					; to access the parameters, we use ebp which points 2 elements above the first parameter in the stack.
 
- 00000024			loopStart:
- 00000024  8B C3			mov eax, ebx			; dividend := gcd
- 00000026  8B D9			mov ebx, ecx			; gcd := remainder
+					; accessing parameters:
+					;
+					; | number2 |
+					; | number1 | <----- EBP + 8
+					; | ret addr|      |
+					; | old ebp | <-- EBP
+					; | old ebx |
+					; | old ecx |
+
+ 0000001F  8B 5D 08			mov ebx, DWORD PTR [ebp + 8]	; gcd := number1
+
+					; accessing parameters:
+					;
+					; | number2 | <----- EBP + 12
+					; | number1 |	   |
+					; | ret addr|      |
+					; | old ebp | <-- EBP
+					; | old ebx |
+					; | old ecx |
+
+ 00000022  8B 4D 0C			mov ecx, DWORD PTR [ebp + 12]	; remainder := number2
+
+ 00000025			loopStart:
+ 00000025  8B C3			mov eax, ebx			; dividend := gcd
+ 00000027  8B D9			mov ebx, ecx			; gcd := remainder
 					
- 00000028  BA 00000000			mov edx, 0				; EDX will be used as the higher order bits for the dividend
+ 00000029  BA 00000000			mov edx, 0				; EDX will be used as the higher order bits for the dividend
 											; we must set EDX to 0 before dividing because the higher order bits are not significant
- 0000002D  F7 F3			div ebx					; divide dividend by gcd (to get dividend mod gcd)
- 0000002F  8B CA			mov ecx, edx			; remainder := dividend mod gcd
- 00000031  83 F9 00			cmp ecx, 0				; remainder = 0?
- 00000034  75 EE			jnz loopStart			; if (remainder != 0) goto loopStart
- 00000036			loopEnd:
+ 0000002E  F7 F3			div ebx					; divide dividend by gcd (to get dividend mod gcd)
+ 00000030  8B CA			mov ecx, edx			; remainder := dividend mod gcd
+ 00000032  83 F9 00			cmp ecx, 0				; remainder = 0?
+ 00000035  75 EE			jne loopStart			; if (remainder != 0) goto loopStart
+ 00000037			loopEnd:
 					
- 00000036  8B C3			mov eax, ebx			; move gcd to eax for return
+ 00000037  8B C3			mov eax, ebx			; move gcd to eax for return
 
 					; restore register values (pop in reverse order)
- 00000038  59				pop ecx
- 00000039  5B				pop ebx
- 0000003A  5D				pop ebp
+
+ 00000039  9D				popfd		; restore EFLAGS
+ 0000003A  59				pop ecx
+
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 |
+					; | ret addr|
+					; | old ebp | <-- EBP
+					; | old ebx | <-- ESP
+
+ 0000003B  5B				pop ebx
+
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 |
+					; | ret addr|
+					; | old ebp | <-- ESP <-- EBP
+
+ 0000003C  5D				pop ebp
+
+					; stack holds:
+					;
+					; | number2 |
+					; | number1 |
+					; | ret addr| <-- ESP
+					;				  EBP --> ? (whatever it was when we pushed it)
 
 					; return to caller
- 0000003B  C3				ret
+ 0000003D  C3				ret
 
- 0000003C			gcdProc ENDP
+ 0000003E			gcdProc ENDP
 
 				END   ; end of source code
-Microsoft (R) Macro Assembler Version 11.00.61030.0	    10/27/16 18:15:32
+Microsoft (R) Macro Assembler Version 11.00.61030.0	    10/27/16 19:00:18
 main.asm						     Symbols 2 - 1
 
 
@@ -110,16 +214,16 @@ Segments and Groups:
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
 _DATA  . . . . . . . . . . . . .	32 Bit	 00000008 Para	  Public  'DATA'	
-_TEXT  . . . . . . . . . . . . .	32 Bit	 0000003C Para	  Public  'CODE'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 0000003E Para	  Public  'CODE'	
 
 
 Procedures, parameters, and locals:
 
                 N a m e                 Type     Value    Attr
 
-gcdProc  . . . . . . . . . . . .	P Near	 00000019 _TEXT	Length= 00000023 Public
-  loopStart  . . . . . . . . . .	L Near	 00000024 _TEXT	
-  loopEnd  . . . . . . . . . . .	L Near	 00000036 _TEXT	
+gcdProc  . . . . . . . . . . . .	P Near	 00000019 _TEXT	Length= 00000025 Public
+  loopStart  . . . . . . . . . .	L Near	 00000025 _TEXT	
+  loopEnd  . . . . . . . . . . .	L Near	 00000037 _TEXT	
 main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 00000019 Public
 
 

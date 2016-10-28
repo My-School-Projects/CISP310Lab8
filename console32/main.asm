@@ -70,7 +70,7 @@ gcdProc PROC
 	; | number1 |
 	; | ret addr| <-- ESP
 
-	push ebp				; save old ebp so I can use it for accessing parameters
+	push ebp				; save old ebp so I can use EBP down below as a stationary reference for accessing parameters
 	mov ebp, esp			; establish access to parameters
 
 	; stack holds:
@@ -80,7 +80,8 @@ gcdProc PROC
 	; | ret addr|
 	; | old ebp | <-- ESP <-- EBP
 
-	; save the registers we will use in this procedure
+	; save the registers we will use in this procedure instructions to calculate the GCD
+
 	push ebx
 
 	; stack holds:
@@ -101,6 +102,8 @@ gcdProc PROC
 	; | old ebp | <-- EBP
 	; | old ebx |
 	; | old ecx | <-- ESP
+
+	pushfd		; save EFLAGS, because this code will change the EFLAGS register
 	
 	; no need to push eax, we will be using it to return the value of gcd
 
@@ -152,12 +155,14 @@ loopStart:
 	div ebx					; divide dividend by gcd (to get dividend mod gcd)
 	mov ecx, edx			; remainder := dividend mod gcd
 	cmp ecx, 0				; remainder = 0?
-	jnz loopStart			; if (remainder != 0) goto loopStart
+	jne loopStart			; if (remainder != 0) goto loopStart
 loopEnd:
 	
 	mov eax, ebx			; move gcd to eax for return
 
 	; restore register values (pop in reverse order)
+
+	popfd		; restore EFLAGS
 	pop ecx
 
 	; stack holds:
