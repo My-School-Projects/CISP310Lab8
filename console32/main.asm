@@ -70,8 +70,8 @@ gcdProc PROC
 	; | number1 |
 	; | ret addr| <-- ESP
 
-	push ebp				; save old ebp so I can use EBP down below as a stationary reference for accessing parameters
-	mov ebp, esp			; establish access to parameters
+	push ebp				; save old EBP so I can use EBP down below as a stationary reference for accessing parameters
+	mov ebp, esp			; establish stationary reference for accessing parameters
 
 	; stack holds:
 	;
@@ -92,8 +92,13 @@ gcdProc PROC
 	; | old ebp | <-- EBP
 	; | old ebx | <-- ESP
 
-	push ecx
+	; ESP increments, but EBP stays put - it is now a stationary reference we can use to access parameters.
 
+	push ecx
+	push edx
+	push edi
+	pushfd		; save EFLAGS, because this code will change the EFLAGS register
+	
 	; stack holds:
 	;
 	; | number2 |
@@ -101,10 +106,11 @@ gcdProc PROC
 	; | ret addr|
 	; | old ebp | <-- EBP
 	; | old ebx |
-	; | old ecx | <-- ESP
+	; | old ecx |
+	; | old edx |
+	; | old edi |
+	; | eflags  | <-- ESP
 
-	pushfd		; save EFLAGS, because this code will change the EFLAGS register
-	
 	; no need to push eax, we will be using it to return the value of gcd
 
 	; LOGIC
@@ -132,6 +138,7 @@ gcdProc PROC
 	; | old ebp | <-- EBP
 	; | old ebx |
 	; | old ecx |
+	;	  ...
 
 	mov ebx, DWORD PTR [ebp + 8]	; gcd := number1
 
@@ -143,6 +150,7 @@ gcdProc PROC
 	; | old ebp | <-- EBP
 	; | old ebx |
 	; | old ecx |
+	;	  ...
 
 	mov ecx, DWORD PTR [ebp + 12]	; remainder := number2
 
@@ -162,17 +170,22 @@ loopEnd:
 
 	; restore register values (pop in reverse order)
 
-	popfd		; restore EFLAGS
-	pop ecx
-
 	; stack holds:
 	;
 	; | number2 |
 	; | number1 |
 	; | ret addr|
 	; | old ebp | <-- EBP
-	; | old ebx | <-- ESP
+	; | old ebx |
+	; | old ecx |
+	; | old edx |
+	; | old edi |
+	; | eflags  | <-- ESP
 
+	popfd		; restore EFLAGS
+	pop edi
+	pop edx
+	pop ecx
 	pop ebx
 
 	; stack holds:
