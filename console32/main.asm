@@ -96,7 +96,6 @@ gcdProc PROC
 
 	push ecx
 	push edx
-	push edi
 	pushfd		; save EFLAGS, because this code will change the EFLAGS register
 	
 	; stack holds:
@@ -108,7 +107,6 @@ gcdProc PROC
 	; | old ebx |
 	; | old ecx |
 	; | old edx |
-	; | old edi |
 	; | eflags  | <-- ESP
 
 	; no need to push eax, we will be using it to return the value of gcd
@@ -179,11 +177,9 @@ loopEnd:
 	; | old ebx |
 	; | old ecx |
 	; | old edx |
-	; | old edi |
 	; | eflags  | <-- ESP
 
 	popfd		; restore EFLAGS
-	pop edi
 	pop edx
 	pop ecx
 	pop ebx
